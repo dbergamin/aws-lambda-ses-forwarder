@@ -11,6 +11,23 @@ Instead of setting up an email server on an EC2 instance to handle email
 redirects, use SES to receive email, and the included Lambda script to process
 it and send it on to the chosen destination.
 
+## Use as a personal mail solution
+
+With some configuration and manual setup, you can use this repository to set up a personal mail solution.
+
+My configuration is suited towards having a Gmail inbox that you use as the backend,
+
+### Prerequisites
+1. You possess a domain that you wish to configure mail on: _example.org_
+2. You have a primary Gmail inbox that you want to read the mail in, sometimes sending on behalf of _example.org_
+3. Serverless framework is installed `npm install -g serverless`
+
+### Setup
+Some manual setup is first required:
+1. Set up your domain as a public zone in Route53. You should see a NS record with four values like `ns-235.awsdns-29.com.`
+2. In your domain host control panel, configure Route53 nameservers as authoratative for your domain using the values from this record.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+3. 
+
 ## Limitations
 
 - SES only allows sending email from addresses or domains that are verified.

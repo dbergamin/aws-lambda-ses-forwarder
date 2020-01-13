@@ -1,0 +1,84 @@
+service: forwarder
+app: mail
+org: dbergamin
+
+custom:
+  awsAccountId: 047394579322
+  domain: danielbergamin.net
+  forwardToGmailMailbox: danielnbergamin
+  mailboxes: "abuse, dan, daniel, security, webmaster"
+  mailBucket: prod-ses-danielbergaminnet
+  s3StoragePrefix: emails/
+  stage: ${opt:stage, self:provider.stage}
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  region: eu-west-1
+
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:ListBucket"
+      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ] }
+
+    - Effect: "Allow"
+      Action:
+        - "s3:PutObject"
+      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket/*" } ] ] }
+
+
+    - Effect: "Allow"
+      Action:
+        - "logs:CreateLogGroup"
+        - "logs:CreateLogStream"
+        - "logs:PutLogEvents"
+      Resource: "arn:aws:logs:${self:provider.region}:${self:custom.awsAccountId}:*"
+
+    - Effect: "Allow"
+      Action: "ses:SendRawEmail"
+      Resource: "*"
+
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+        - "s3:PutObject"
+      Resource: "arn:aws:s3:::${self:custom.mailBucket}/*"
+
+# Note: SES configuration must be done manually.
+
+functions:
+  mailforwarder:
+    handler: index.handler
+    environment:
+      BUCKET: ${self:custom.mailBucket}
+      DOMAIN: ${self:custom.domain}
+      FORWARD_TO_MAILBOX: ${self:custom.forwardToGmailMailbox}
+      FORWARDING_FROM_ADDRESS: postmaster@${self:custom.domain}
+      MAILBOXES: ${self:custom.mailboxes}
+      S3_MAIL_STORAGE_PREFIX: ${self:custom.s3StoragePrefix}
+
+# Uncomment the bucket for first run if you'd like to create it
+resources:
+  Resources:
+#    MailBucket:
+#      Type: AWS::S3::Bucket
+#      Properties:
+#        BucketName: ${self:custom.mailBucket}
+    MxRecord:
+      Type: AWS::Route53::RecordSet
+      Properties:
+        HostedZoneName: ${self:custom.domain}.
+        Name: ${self:custom.domain}
+        ResourceRecords: 
+          - 10 inbound-smtp.${self:provider.region}.amazonaws.com.
+        Type: MX
+        TTL: 600
+    SESLambdaInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        Action: lambda:invokeFunction
+        Principal: ses.amazonaws.com
+        SourceAccount: ${self:custom.awsAccountId}
+        FunctionName:
+          Ref: MailforwarderLambdaFunction

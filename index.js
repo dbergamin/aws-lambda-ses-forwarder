@@ -1,5 +1,3 @@
-"use strict";
-
 var AWS = require('aws-sdk');
 
 console.log("AWS Lambda SES Forwarder // @arithmetric // Version 4.2.0");
@@ -27,26 +25,38 @@ console.log("AWS Lambda SES Forwarder // @arithmetric // Version 4.2.0");
 //
 //   To match a mailbox name on all domains, use a key without the "at" symbol
 //   and domain part of an email address (i.e. `info`).
+
+var DOMAIN = process.env.DOMAIN;
+var AT_DOMAIN = '@' + process.env.DOMAIN;
+var FORWARD_TO_MAILBOX = process.env.FORWARD_TO_MAILBOX;
+
+// Small function to parse the mailboxes
+function parseMailboxListIntoForwardMapping() {
+  var _forwardMapping = {};
+  var _mailboxList = process.env.MAILBOXES.split(',');
+
+  // Get an array of the mailbox names like [abuse, webmaster] - may contain whitespace
+  // They will get forwarded to an address like mygmailinbox+abuseatexampleorg@gmail.com
+  // The Gmail client understands this and presents them nicer, as well as letting you filter more easily
+  _mailboxList.forEach(function(mailboxName){
+    var _mailboxName = mailboxName.trim();
+    var _address = _mailboxName + AT_DOMAIN;
+    var _gmailTag = `${_mailboxName}at${DOMAIN}`;
+    _forwardMapping[_address] = [ `${FORWARD_TO_MAILBOX}+${_gmailTag}@gmail.com` ];
+  });
+
+  // Finally, add a generic catch-all for the domain
+  // No mail should really be getting here if we filter the same list in SES
+  _forwardMapping[AT_DOMAIN] = [ `${FORWARD_TO_MAILBOX}@gmail.com` ];
+  return _forwardMapping;
+}
+
 var defaultConfig = {
-  fromEmail: "noreply@example.com",
+  fromEmail: process.env.FORWARDING_FROM_ADDRESS,
   subjectPrefix: "",
-  emailBucket: "s3-bucket-name",
-  emailKeyPrefix: "emailsPrefix/",
-  forwardMapping: {
-    "info@example.com": [
-      "example.john@example.com",
-      "example.jen@example.com"
-    ],
-    "abuse@example.com": [
-      "example.jim@example.com"
-    ],
-    "@example.com": [
-      "example.john@example.com"
-    ],
-    "info": [
-      "info@example.com"
-    ]
-  }
+  emailBucket: process.env.BUCKET,
+  emailKeyPrefix: process.env.S3_MAIL_STORAGE_PREFIX,
+  forwardMapping: parseMailboxListIntoForwardMapping()
 };
 
 /**
